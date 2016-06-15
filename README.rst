@@ -2,7 +2,7 @@
 codebehind
 ============
 
-A collection of magic.
+Because i dont want to do the same thing all over again.
 
 Quick start
 -----------
