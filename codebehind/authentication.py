@@ -63,9 +63,10 @@ class CodeBehindAuthentication(authentication.BaseAuthentication):
 				print "server time = %d |-| client time = %d" % (server_time_unix,client_timestamp)
 
 			#check for server time if client time stamp is still valid
-			# if((server_time_unix - client_timestamp) > 60):
-			#     raise exceptions.AuthenticationFailed('expired signature!')
-			#     return None
+			if not settings.DEBUG:
+				if((server_time_unix - client_timestamp) > 60 * 2):
+					raise exceptions.AuthenticationFailed('expired signature!')
+					return None
 
 			if not computed_signature == client_signature:
 				raise exceptions.AuthenticationFailed('invalid authentication signature!')
