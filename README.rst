@@ -2,7 +2,6 @@
 codebehind
 ============
 
-![Twitter: @michaelhenry119](https://img.shields.io/badge/contact-@michaelhenry-blue.svg?style=flat)
 .. image:: https://travis-ci.org/michaelhenry/codebehind.svg?branch=master
     :target: https://travis-ci.org/michaelhenry/codebehind
     
