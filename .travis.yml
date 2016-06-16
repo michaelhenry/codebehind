@@ -1,0 +1,14 @@
+language: python
+
+sudo: false
+
+env:
+    - TOX_ENV=py27
+matrix:
+    fast_finish: true
+
+install:
+    - pip install tox
+
+script:
+    - tox -e $TOX_ENV
