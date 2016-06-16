@@ -1,11 +1,10 @@
-.. image:: https://travis-ci.org/michaelhenry/codebehind.svg?branch=master
-    :target: https://travis-ci.org/michaelhenry/codebehind
-
 ============
 codebehind
 ============
 
 
+.. image:: https://travis-ci.org/michaelhenry/codebehind.svg?branch=master
+    :target: https://travis-ci.org/michaelhenry/codebehind
 
 
 
