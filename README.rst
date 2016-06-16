@@ -3,8 +3,8 @@ codebehind
 ============
 
 
-[![Build Status](https://travis-ci.org/michaelhenry/codebehind.svg?branch=master)](https://travis-ci.org/michaelhenry/codebehind)
-
+.. image:: https://travis-ci.org/michaelhenry/codebehind.svg?branch=master
+    :target: https://travis-ci.org/michaelhenry/codebehind
 
 Because i dont want to do the same thing all over again. If you are using Django Rest Framework, then this will might help you.
 
