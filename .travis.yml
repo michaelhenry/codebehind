@@ -4,6 +4,7 @@ sudo: false
 
 env:
     - TOX_ENV=py27-flake8
+    - TOX_ENV=py33-flake8
 matrix:
   fast_finish: true
 
