@@ -3,16 +3,12 @@ language: python
 sudo: false
 
 env:
-    - TOX_ENV=py33-1.6.X
-    - TOX_ENV=py33-1.5.X
-    - TOX_ENV=py27-1.6.X
-    - TOX_ENV=py27-1.5.X
-    - TOX_ENV=py27-1.4.X
+    - TOX_ENV=py27
 matrix:
-  fast_finish: true
+    fast_finish: true
 
 install:
-  - pip install tox
+    - pip install tox
 
 script:
     - tox -e $TOX_ENV
