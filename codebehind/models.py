@@ -1,9 +1,8 @@
-import binascii
+import uuid
 import os
 from django.contrib.auth.models import User
 from django.conf import settings
 from django.db import models
-from django.contrib.auth import get_user_model
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from datetime import datetime
@@ -26,19 +25,9 @@ class TimeStampedModel(models.Model):
 
 
 class UserSecret(TimeStampedModel):
-	key = models.CharField(max_length=40, primary_key=True)
+	key = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 	user = models.OneToOneField(User, related_name='secret')
 	is_verified = models.BooleanField(default=False)
-	verification_code = models.CharField(max_length=40)
-
-	def save(self, *args, **kwargs):
-		if not self.key:
-			self.key = self.generate_key()
-			self.verification_code = self.generate_key()
-		return super(UserSecret, self).save(*args, **kwargs)
-
-	def generate_key(self):
-		return "%s"  % binascii.hexlify(os.urandom(20)).decode()
 
 	def __str__(self):
 		return "%s" % self.key

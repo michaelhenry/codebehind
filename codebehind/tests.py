@@ -16,6 +16,8 @@ class UserRegistrationTestCase(TestCase):
 
 	def test_user_has_secret(self):
 		test_user = User.objects.get(username="test_username")
+		self.assertTrue(test_user.secret.key)
 		print ">>>secret:%s" % test_user.secret.key
-		self.assertTrue(len(test_user.secret.key) > 0)
+
+		self.assertTrue(test_user.secret.key)
 		print ">>>verified:%s" % test_user.secret.is_verified
