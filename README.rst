@@ -20,6 +20,7 @@ Features
 - Registration and Login
 - Different Authentication Logic (Basic , Token, HMAC Signature)
 - Basic Helpers
+- Since it use DRF, Browsable Rest API!
 
 
 
