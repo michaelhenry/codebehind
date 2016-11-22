@@ -20,7 +20,7 @@ setup(
 	author='Michael Henry Pantaleon',
 	author_email='me@iamkel.net',
 	install_requires=[
-		'Django>=1.9','djangorestframework==3.3.3',
+		'Django>=1.9','djangorestframework==3.5.3',
 	],
 	classifiers=[
 		'Environment :: Web Environment',
