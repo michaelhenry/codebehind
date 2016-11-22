@@ -30,7 +30,7 @@ class CodeBehindAuthentication(authentication.BaseAuthentication):
 			print "use other authentication method if available"
 			return None
 
-		path =  request.META.get('PATH_INFO')
+		path = request.META.get('PATH_INFO')
 		client_timestamp = request.META.get('HTTP_TIMESTAMP')
 		client_timestamp = int(client_timestamp) if client_timestamp else 0
 		client_signature = request.META.get('HTTP_SIGNATURE')
@@ -47,7 +47,7 @@ class CodeBehindAuthentication(authentication.BaseAuthentication):
 			print "valid user is %s" % username
 
 			# this will generate raw message for signature
-			message = "%s %d" % (path,client_timestamp)
+			message = "%s %s %d" % (request.method, path,client_timestamp)
 			print "message is %s " % message
 
 			# create an hmac signature base on user.secret
