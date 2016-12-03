@@ -1,9 +1,9 @@
 import hashlib, hmac
 import time
-from django.contrib.auth.models import User
 from rest_framework import authentication
 from rest_framework import exceptions
 from django.conf import settings
+from django.shortcuts import get_object_or_404
 
 from . models import UserSecret
 
@@ -42,38 +42,36 @@ class CodeBehindAuthentication(authentication.BaseAuthentication):
 			raise exceptions.AuthenticationFailed('no username!')
 			return None
 
-		try:
-			user = User.objects.get(username=username)
-			print "valid user is %s" % username
+ 
+		user = get_object_or_404(settings.AUTH_USER_MODEL, username=username)
+		print "valid user is %s" % username
 
-			# this will generate raw message for signature
-			message = "%s %s %d" % (request.method, path,client_timestamp)
-			print "message is %s " % message
+		# this will generate raw message for signature
+		message = "%s %s %d" % (request.method, path,client_timestamp)
+		print "message is %s " % message
 
-			# create an hmac signature base on user.secret
-			hmac_obj = hmac.new(str(user.secret.key), message,hashlib.sha256)
-			computed_signature = hmac_obj.hexdigest()
+		# create an hmac signature base on user.secret
+		hmac_obj = hmac.new(str(user.secret.key), message,hashlib.sha256)
+		computed_signature = hmac_obj.hexdigest()
 
-			server_time_unix = int(time.time())
+		server_time_unix = int(time.time())
 
-			if settings.DEBUG:
-				print "user name is %s " % username
-				print "Client computed hmac is %s WITH hash256( %s , %s )" % (client_signature, path , client_timestamp)
-				print "Server computed hmac is %s for user.secret = %s WITH hash256( %s , %s )" % (computed_signature, user.secret.key ,path , client_timestamp)
-				print "server time = %d |-| client time = %d" % (server_time_unix,client_timestamp)
+		if settings.DEBUG:
+			print "user name is %s " % username
+			print "Client computed hmac is %s WITH hash256( %s , %s )" % (client_signature, path , client_timestamp)
+			print "Server computed hmac is %s for user.secret = %s WITH hash256( %s , %s )" % (computed_signature, user.secret.key ,path , client_timestamp)
+			print "server time = %d |-| client time = %d" % (server_time_unix,client_timestamp)
 
-			#check for server time if client time stamp is still valid
-			if not settings.DEBUG:
-				if((server_time_unix - client_timestamp) > 60 * 2):
-					raise exceptions.AuthenticationFailed('expired signature!')
-					return None
-
-			if not computed_signature == client_signature:
-				raise exceptions.AuthenticationFailed('invalid authentication signature!')
+		#check for server time if client time stamp is still valid
+		if not settings.DEBUG:
+			if((server_time_unix - client_timestamp) > 60 * 2):
+				raise exceptions.AuthenticationFailed('expired signature!')
 				return None
 
-		except User.DoesNotExist:
-			raise exceptions.AuthenticationFailed('invalid user!')
-		return (user, None)
+		if not computed_signature == client_signature:
+			raise exceptions.AuthenticationFailed('invalid authentication signature!')
+			return None
+
+		return user
 
 

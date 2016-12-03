@@ -1,6 +1,5 @@
 import uuid
 import os
-from django.contrib.auth.models import User
 from django.conf import settings
 from django.db import models
 from django.db.models.signals import post_save
@@ -26,7 +25,7 @@ class TimeStampedModel(models.Model):
 
 class UserSecret(TimeStampedModel):
 	key = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-	user = models.OneToOneField(User, related_name='secret')
+	user = models.OneToOneField(settings.AUTH_USER_MODEL, related_name='secret')
 	is_verified = models.BooleanField(default=False)
 
 	def __str__(self):
