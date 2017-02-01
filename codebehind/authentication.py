@@ -1,77 +1,225 @@
-import hashlib, hmac
+import urllib, hashlib, hmac, re
 import time
 from rest_framework import authentication
 from rest_framework import exceptions
 from django.conf import settings
 from django.shortcuts import get_object_or_404
-
-from . models import UserSecret
+from django.contrib.auth import get_user_model
+from codebehind.models import UserSecret
 
 
 class CodeBehindAuthentication(authentication.BaseAuthentication):
 	"""
 	This will check if the Signature of the client is valid.
-	
-	Client Headers:
-		X-Username: the requester username
-		Timestamp: the request timestamp in unix format
-		Signature: = HMAC(user.secret, SHA(PATH + Timestamp))
-
 	author: Michael Henry Pantaleon
 			me@iamkel.net
+	format: 
+	Authorization: algorithm Credential=username SignedHeaders=SignedHeaders Signature=signature
+	sample:
+	# Authorization: X-HMAC-SHA256 Credential=USERNAME SignedHeaders=content-type;host;x-header Signature=CALCULATED_SIGNATURE
 	"""
-	# this will handle the authentication of every request
+
+	def remove_prefix(self, text, prefix):
+		return text[text.startswith(prefix) and len(prefix):]
+
+	def get_request_headers(self, request):
+		"""
+		this will trim, and will get only the request header
+		"""
+		regex_http = re.compile(r'^(HTTP_.+|X_.+|CONTENT_TYPE|CONTENT_LENGTH)$')
+		request_headers = {}
+		for header in request.META:
+
+			if regex_http.match(header):
+				strip_header = self.remove_prefix(header, "HTTP_").replace("_","-").lower()
+				request_headers[strip_header] = request.META[header]
+		return request_headers
+
+	def get_valid_headers(self, keys_of_valid_headers, headers):
+		"""
+		this get all headers from the authorizationHeader.signedHeader
+		"""
+		keys = keys_of_valid_headers.split(";")
+		valid_headers = {}
+		for key in keys:
+			if headers.has_key(key):
+				valid_headers[key] = headers[key]
+		return valid_headers
+
+	def sign(self, key, msg):
+		"""
+		this will do the hmac signing
+		"""
+		return hmac.new(key, msg, hashlib.sha256)
+
+
+	def get_signature_key(self, key, timestamp):
+		"""
+		hmac of secretkey and timestamp
+		can include other info also
+		"""
+		return self.sign(key, timestamp).digest()
+
+	def sort_dict(self, dict):
+		"""
+		This will sort dictionary according to keys
+		"""
+		return sorted(dict.items())
+
+	def get_canonical_param(self, dict):
+		"""
+		This will sort(alphabetically regardless if it is uppercase or lowercase) and convert the params like query string or form data
+		into & separated values
+
+		eg. age=20&name=kel&x-var=32
+		"""
+		if dict == None or len(dict) == 0:
+			return ''
+		return '&'.join("%s=%s" % (key,urllib.quote(val)) for (key,val) in self.sort_dict(dict))
+
+	def get_canonical_headers(self, headers):
+		"""
+		will sort the header name alpabetically and append \n
+		name:value\n
+
+		eg. content-type:application/json\nlength:100\n
+		"""
+		return ''.join("%s:%s\n" % (key,urllib.quote(val)) for (key,val) in self.sort_dict(headers))
+		
+	def get_signed_headers(self, headers):
+		"""
+		semi-colon-separated header name(sorted alphabetically)
+		content-type;length;
+		"""
+		return ';'.join("%s" % (key) for (key,val) in self.sort_dict(headers))
+
+	def get_signature(self, 
+		access_key, 
+		secret_key, 
+		algorithm, 
+		http_method, 
+		canonical_uri, 
+		timestamp, 
+		query_param={}, 
+		headers={},
+		payload={}):
+
+		"""
+		This will get the signature
+		"""
+		
+		canonical_query_string = self.get_canonical_param(query_param)
+		canonical_headers = self.get_canonical_headers(headers)
+		signed_headers = self.get_signed_headers(headers)
+		canonical_payload = self.get_canonical_param(payload)
+		canonical_payload_hash = hashlib.sha256(canonical_payload).hexdigest()
+
+		canonical_request = "%s\n%s\n%s\n%s\n%s\n%s" % (
+			http_method, 
+			canonical_uri,
+		 	canonical_query_string, 
+		 	canonical_headers, 
+		 	signed_headers, 			 	
+		 	canonical_payload_hash)
+
+		canonical_request_hash = hashlib.sha256(canonical_request).hexdigest()
+
+		string_to_sign = "%s\n%s\n%s" % (
+			algorithm, 
+			timestamp, 
+			canonical_request_hash)
+
+		signature_key = self.get_signature_key(secret_key, timestamp)
+		signature = self.sign(signature_key, string_to_sign)
+		signature_hex = signature.hexdigest()
+		return signature_hex
+
+	def get_auth_header(self,
+		access_key,
+		algorithm,
+		signed_headers,
+		signature):
+		"""
+		Formatting for the authorization header
+		format:
+		algorithm Credential=access key ID, SignedHeaders=SignedHeaders, Signature=signature
+		"""
+		return "%s Credential=%s SignedHeaders=%s Signature=%s" % (
+			algorithm, 
+			access_key, 
+			signed_headers, 
+			signature)
+
 	def authenticate(self, request):
 
-		# server is converting the header's - to _ 
-		username = request.META.get('HTTP_X_USERNAME')
+		"""
+		this will handle the authentication of every request
+		"""
 
-		if not username:
-			print "use other authentication method if available"
-			return None
+		try:
+			request_headers = self.get_request_headers(request)
 
-		path = request.META.get('PATH_INFO')
-		client_timestamp = request.META.get('HTTP_TIMESTAMP')
-		client_timestamp = int(client_timestamp) if client_timestamp else 0
-		client_signature = request.META.get('HTTP_SIGNATURE')
+			request_auth_header = request_headers.get("authorization", "")
 
-		if not client_signature:
-			print "maybe it is a basic authentication"
+			auth_header_info = request_auth_header.split(" ")
 
-		if not username:
-			raise exceptions.AuthenticationFailed('no username!')
-			return None
-
- 
-		user = get_object_or_404(settings.AUTH_USER_MODEL, username=username)
-		print "valid user is %s" % username
-
-		# this will generate raw message for signature
-		message = "%s %s %d" % (request.method, path,client_timestamp)
-		print "message is %s " % message
-
-		# create an hmac signature base on user.secret
-		hmac_obj = hmac.new(str(user.secret.key), message,hashlib.sha256)
-		computed_signature = hmac_obj.hexdigest()
-
-		server_time_unix = int(time.time())
-
-		if settings.DEBUG:
-			print "user name is %s " % username
-			print "Client computed hmac is %s WITH hash256( %s , %s )" % (client_signature, path , client_timestamp)
-			print "Server computed hmac is %s for user.secret = %s WITH hash256( %s , %s )" % (computed_signature, user.secret.key ,path , client_timestamp)
-			print "server time = %d |-| client time = %d" % (server_time_unix,client_timestamp)
-
-		#check for server time if client time stamp is still valid
-		if not settings.DEBUG:
-			if((server_time_unix - client_timestamp) > 60 * 2):
-				raise exceptions.AuthenticationFailed('expired signature!')
+			if not len(auth_header_info) == 4:
 				return None
 
-		if not computed_signature == client_signature:
-			raise exceptions.AuthenticationFailed('invalid authentication signature!')
-			return None
 
-		return user
+			request_algorithm = auth_header_info[0]
 
+			algorithm = "X-HMAC-256"
+			if hasattr(settings, 'CODEBEHIND_ALGORITHM'):
+				algorithm = settings.CODEBEHIND_ALGORITHM
+
+			if not algorithm == request_algorithm:
+				return None
+
+			request_credential = auth_header_info[1]
+			request_username = request_credential.split("=")[1]
+			request_signed_headers = auth_header_info[2].split("=")[1]
+			request_valid_headers = self.get_valid_headers(request_signed_headers, 
+				request_headers)
+			request_signature = auth_header_info[3].split("=")[1]
+			
+			request_payload = request.data
+
+			canonical_uri = request.META.get('PATH_INFO')
+			request_qparams = request.query_params
+			content_type = request.content_type
+			request_method = request.method
+			request_timestamp = request_headers.get('x-timestamp')
+			user = get_object_or_404(get_user_model(), username='admin')
+			user_secret_key = user.secret
+			server_time_unix = float(time.time())
+
+			if abs(server_time_unix - float(request_timestamp)) > 60 * 2:
+				raise exceptions.AuthenticationFailed('Invalid request time!')
+
+			access_key = user.username
+			signature = self.get_signature(
+				access_key, 
+				str(user.secret.key), 
+				algorithm, 
+				request_method, 
+				canonical_uri,
+				request_timestamp, 
+				request_qparams,
+				request_valid_headers,
+				request_payload)
+
+			auth_header = self.get_auth_header(
+				access_key,
+				request_algorithm,
+				request_signed_headers,
+				signature)
+
+			if not signature == request_signature:
+				raise exceptions.AuthenticationFailed('Signature dont matched!')
+			
+			return (user, None)
+
+		except Exception:
+			raise exceptions.AuthenticationFailed('Invalid signature input!')
 
