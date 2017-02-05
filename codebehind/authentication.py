@@ -31,8 +31,8 @@ class CodeBehindAuthentication(authentication.BaseAuthentication):
 		for header in request.META:
 
 			if regex_http.match(header):
-				strip_header = self.remove_prefix(header, "HTTP_").replace("_","-").lower()
-				request_headers[strip_header] = request.META[header]
+				strip_header = self.remove_prefix(header, "HTTP_").replace("_","-").lower().strip()
+				request_headers[strip_header] = self.trim_header_value(request.META[header])
 		return request_headers
 
 	def get_valid_headers(self, keys_of_valid_headers, headers):
@@ -52,6 +52,9 @@ class CodeBehindAuthentication(authentication.BaseAuthentication):
 		"""
 		return hmac.new(key, msg, hashlib.sha256)
 
+	def trim_header_value(self, text):
+		text = re.sub(r" +", " ", text)
+		return text.strip()
 
 	def get_signature_key(self, key, timestamp):
 		"""
@@ -66,29 +69,44 @@ class CodeBehindAuthentication(authentication.BaseAuthentication):
 		"""
 		return sorted(dict.items())
 
+	def url_encode(self, text):
+		return urllib.quote(text)
+
 	def get_canonical_param(self, dict):
 		"""
-		This will sort(alphabetically regardless if it is uppercase or lowercase) and convert the params like query string or form data
-		into & separated values
+		- sorted by key
+		- separated by =
+		- uri_encoded key
+		- uri_encoded value
+		
+		url_encoded(key)=url_encoded(value)
 
 		eg. age=20&name=kel&x-var=32
 		"""
 		if dict == None or len(dict) == 0:
 			return ''
-		return '&'.join("%s=%s" % (key,urllib.quote(val)) for (key,val) in self.sort_dict(dict))
+		return '&'.join("%s=%s" % (self.url_encode(key), self.url_encode(val)) for (key,val) in self.sort_dict(dict))
 
 	def get_canonical_headers(self, headers):
 		"""
-		will sort the header name alpabetically and append \n
+		- header name and value is separated by colon
+		- reduced consecutive white spaces into single white space
+		- trimmed leading and trailing in header name
+		- append \n after every header value
+		
 		name:value\n
 
-		eg. content-type:application/json\nlength:100\n
+		eg. 
+		content-type:application/json\n
+		length:100\n
+
 		"""
-		return ''.join("%s:%s\n" % (key,urllib.quote(val)) for (key,val) in self.sort_dict(headers))
+		return ''.join("%s:%s\n" % (key, val) for (key,val) in self.sort_dict(headers))
 		
 	def get_signed_headers(self, headers):
 		"""
-		semi-colon-separated header name(sorted alphabetically)
+		- only header name separate by semi colon.
+		eg.
 		content-type;length;
 		"""
 		return ';'.join("%s" % (key) for (key,val) in self.sort_dict(headers))
@@ -190,7 +208,7 @@ class CodeBehindAuthentication(authentication.BaseAuthentication):
 			content_type = request.content_type
 			request_method = request.method
 			request_timestamp = request_headers.get('x-timestamp')
-			user = get_object_or_404(get_user_model(), username='admin')
+			user = get_object_or_404(get_user_model(), username=request_username)
 			user_secret_key = user.secret
 			server_time_unix = float(time.time())
 
