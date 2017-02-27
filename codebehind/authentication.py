@@ -75,6 +75,7 @@ class CodeBehindAuthentication(authentication.BaseAuthentication):
 	def get_canonical_param(self, dict):
 		"""
 		- sorted by key
+		- convert value to string
 		- separated by =
 		- uri_encoded key
 		- uri_encoded value
@@ -83,9 +84,12 @@ class CodeBehindAuthentication(authentication.BaseAuthentication):
 
 		eg. age=20&name=kel&x-var=32
 		"""
-		if dict == None or len(dict) == 0:
-			return ''
-		return '&'.join("%s=%s" % (self.url_encode(key), self.url_encode(val)) for (key,val) in self.sort_dict(dict))
+		try:
+			if dict == None or len(dict) == 0:
+				return ''
+			return '&'.join("%s=%s" % (self.url_encode(key), self.url_encode(str(val))) for (key,val) in self.sort_dict(dict))
+		except Exception, e:
+			print e
 
 	def get_canonical_headers(self, headers):
 		"""
@@ -101,7 +105,7 @@ class CodeBehindAuthentication(authentication.BaseAuthentication):
 		length:100\n
 
 		"""
-		return ''.join("%s:%s\n" % (key, val) for (key,val) in self.sort_dict(headers))
+		return ''.join("%s:%s\n" % (key, str(val)) for (key,val) in self.sort_dict(headers))
 		
 	def get_signed_headers(self, headers):
 		"""
