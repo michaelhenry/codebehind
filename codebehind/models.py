@@ -11,8 +11,6 @@ from datetime import datetime
 def create_user_secret(sender, instance=None, created=False, **kwargs):
 	if created:
 		key = UserSecret.objects.create(user=instance)
-		if settings.DEBUG:
-			print key
 
 
 class TimeStampedModel(models.Model):

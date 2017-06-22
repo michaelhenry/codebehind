@@ -10,7 +10,7 @@ os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 
 setup(
 	name='codebehind',
-	version='1.4.7',
+	version='1.4.8',
 	packages=find_packages(),
 	include_package_data=True,
 	license='MIT',
@@ -20,7 +20,7 @@ setup(
 	author='Michael Henry Pantaleon',
 	author_email='me@iamkel.net',
 	install_requires=[
-		'Django>=1.9','djangorestframework==3.5.3',
+		'Django>=1.9','djangorestframework>=3.5.3',
 	],
 	classifiers=[
 		'Environment :: Web Environment',

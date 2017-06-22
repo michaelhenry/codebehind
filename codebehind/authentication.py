@@ -87,8 +87,8 @@ class CodeBehindAuthentication(authentication.BaseAuthentication):
 			if dict == None or len(dict) == 0:
 				return ''
 			return '&'.join("%s=%s" % (self.url_encode(key), self.url_encode(str(val))) for (key,val) in self.sort_dict(dict))
-		except Exception, e:
-			print e
+		except:
+			raise
 
 	def get_canonical_headers(self, headers):
 		"""
@@ -264,6 +264,6 @@ class CodeBehindAuthentication(authentication.BaseAuthentication):
 			
 			return (user, None)
 
-		except Exception, e:
-			raise e
+		except:
+			raise
 		
