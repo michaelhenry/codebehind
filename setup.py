@@ -10,7 +10,7 @@ os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 
 setup(
 	name='codebehind',
-	version='1.4.1',
+	version='1.4.7',
 	packages=find_packages(),
 	include_package_data=True,
 	license='MIT',
@@ -36,3 +36,6 @@ setup(
 		'Topic :: Internet :: WWW/HTTP :: Dynamic Content',
 	],
 )
+
+# upload using twine
+# https://pypi.python.org/pypi/twine

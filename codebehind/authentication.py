@@ -3,7 +3,6 @@ import time
 from rest_framework import authentication
 from rest_framework import exceptions
 from django.conf import settings
-from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
 from codebehind.models import UserSecret
 
@@ -179,69 +178,92 @@ class CodeBehindAuthentication(authentication.BaseAuthentication):
 		"""
 
 		try:
+			cb_config = {}
+
+			if hasattr(settings, 'CODEBEHIND_CONFIG'):
+				cb_config = settings.CODEBEHIND_CONFIG
+
+			algorithm = cb_config.get("ALGORITHM", "X-HMAC-256")
+			signing_query_prefix = cb_config.get("SIGNING_QUERY_PREFIX","X")
+			validity_duration = cb_config.get("VALIDITY_DURATION", 15 * 60)
+
+			request_algorithm = ""
+			request_credential = ""
+			request_timestamp = ""
+			request_signed_headers = ""
+			request_signature = ""
+			request_qparams = request.query_params
+
 			request_headers = self.get_request_headers(request)
 
-			request_auth_header = request_headers.get("authorization", "")
+			if not request_headers.get("authorization") == None:
+				# if has authorization header then use this method
+				request_auth_header = request_headers.get("authorization", "")
+				auth_header_info = request_auth_header.split(" ")
+				if not len(auth_header_info) == 4:
+					return None
+				
+				request_algorithm = auth_header_info[0]
+				request_credential = auth_header_info[1].split("=")[1]
+				request_signed_headers = auth_header_info[2].split("=")[1]
+				request_valid_headers = self.get_valid_headers(request_signed_headers, 
+					request_headers)
+				request_signature = auth_header_info[3].split("=")[1]
+				request_timestamp = request_headers.get('x-timestamp')
 
-			auth_header_info = request_auth_header.split(" ")
+			elif not request_qparams.get("%s-Algorithm" % signing_query_prefix) == None:
+				# if signed using query parameters
+				request_algorithm = request_qparams.get("%s-Algorithm" % signing_query_prefix)
+				request_credential = request_qparams.get("%s-Credential" % signing_query_prefix)
+				request_timestamp = request_qparams.get("%s-Timestamp" % signing_query_prefix)
+				request_signed_headers = request_qparams.get("%s-SignedHeaders" % signing_query_prefix)
+				request_valid_headers = self.get_valid_headers(request_signed_headers, 
+					request_headers)
+				request_signature = request_qparams.get("%s-Signature" % signing_query_prefix)
+				regex_signing_qparams = re.compile(r'^(%s-.+)$' % signing_query_prefix)
+				request_qparams = {key: value for key, value in request_qparams.items() if not regex_signing_qparams.match(key)}
+				
 
-			if not len(auth_header_info) == 4:
-				return None
-
-
-			request_algorithm = auth_header_info[0]
-
-			algorithm = "X-HMAC-256"
-			if hasattr(settings, 'CODEBEHIND_ALGORITHM'):
-				algorithm = settings.CODEBEHIND_ALGORITHM
-
+			if not request_algorithm:
+				return (None)
+				
 			if not algorithm == request_algorithm:
-				return None
+				raise exceptions.ParseError("Algorithm is invalid.")
 
-			request_credential = auth_header_info[1]
-			request_username = request_credential.split("=")[1]
-			request_signed_headers = auth_header_info[2].split("=")[1]
-			request_valid_headers = self.get_valid_headers(request_signed_headers, 
-				request_headers)
-			request_signature = auth_header_info[3].split("=")[1]
-			
 			request_payload = request.data
 
 			canonical_uri = request.META.get('PATH_INFO')
-			request_qparams = request.query_params
 			content_type = request.content_type
 			request_method = request.method
-			request_timestamp = request_headers.get('x-timestamp')
-			user = get_object_or_404(get_user_model(), username=request_username)
-			user_secret_key = user.secret
+			
+			user_q = get_user_model().objects.filter(username=request_credential)
+			if user_q.exists():
+				user = user_q.first()
+			else:
+				raise exceptions.ParseError("Credential is invalid.")
+
 			server_time_unix = float(time.time())
 
-			if abs(server_time_unix - float(request_timestamp)) > 60 * 2:
-				raise exceptions.AuthenticationFailed('Invalid request time!')
+			if abs(server_time_unix - float(request_timestamp)) > validity_duration:
+				raise exceptions.AuthenticationFailed('Invalid request time.')
 
 			access_key = user.username
 			signature = self.get_signature(
 				access_key, 
 				str(user.secret.key), 
-				algorithm, 
+				request_algorithm, 
 				request_method, 
 				canonical_uri,
 				request_timestamp, 
 				request_qparams,
 				request_valid_headers,
 				request_payload)
-
-			auth_header = self.get_auth_header(
-				access_key,
-				request_algorithm,
-				request_signed_headers,
-				signature)
-
+			
 			if not signature == request_signature:
-				raise exceptions.AuthenticationFailed('Signature dont matched!')
+				raise exceptions.AuthenticationFailed('Signature don\'t matched.')
 			
 			return (user, None)
 
-		except Exception:
-			raise exceptions.AuthenticationFailed('Invalid signature input!')
-
+		except Exception, e:
+			raise e
+		
